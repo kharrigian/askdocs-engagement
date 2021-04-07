@@ -1,0 +1,11 @@
+numpy
+scipy
+pandas
+matplotlib
+tqdm
+retriever @ git+ssh://git@github.com/kharrigian/retriever@main#egg=retriever
+emoji
+gensim
+nltk
+python-Levenshtein
+scikit-learn

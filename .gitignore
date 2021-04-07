@@ -1,0 +1,17 @@
+## Data
+data/raw/AskDocs
+data/processed/*.csv
+
+## Documentation
+documentation/*.pdf
+
+## Plots
+plots/summary_statistics/
+
+## Code
+scripts/utilities/legacy
+
+## Artifacts
+*.pyc
+*__pycache__*
+*.DS_Store
