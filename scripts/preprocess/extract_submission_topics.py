@@ -14,7 +14,7 @@ RANDOM_SEED = 42
 CACHE_TOP_K = 50
 
 ## Model Parameters
-MODEL_N_ITER = 1000
+MODEL_N_ITER = 5000
 INITIAL_K = 100
 ALPHA_PRIOR = 0.1
 ETA_PRIOR = 0.01
@@ -404,7 +404,7 @@ def main():
     if not os.path.exists(MODEL_DIR):
         _ = os.makedirs(MODEL_DIR)
     ## Filenames
-    submission_filenames = sorted(glob(f"{DATA_DIR}raw/AskDocs/submissions/*.json.gz"))[-100:-70]
+    submission_filenames = sorted(glob(f"{DATA_DIR}raw/AskDocs/submissions/*.json.gz"))
     ## Try To Load Phrasers, Or Learn Them as Fallback
     phrasers, ngrams = learn_phrasers(submission_filenames,
                                       verbose=False,
