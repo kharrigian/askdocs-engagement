@@ -7,13 +7,26 @@ Identify Health Topics in Submissions
 ### Configuration
 ####################
 
-## Modeling Parameters
+## Script Meta Parameters
+NUM_JOBS = 8
+MODEL_DIR = "./data/processed/models/topic_model/"
+RANDOM_SEED = 42
+CACHE_TOP_K = 50
+
+## Model Parameters
+MODEL_N_ITER = 1000
+INITIAL_K = 100
+ALPHA_PRIOR = 0.1
+ETA_PRIOR = 0.01
+GAMMA_PRIOR = 0.01
+
+## Vocabulary Parameters
 MAX_N_GRAM = 3
-MIN_VOCAB_DF = 25
-MIN_VOCAB_CF = 50
+PHRASE_THRESHOLD = 10
+MIN_VOCAB_DF = 10
+MIN_VOCAB_CF = 25
 MAX_VOCAB_SIZE = 500000
 RM_TOP_VOCAB = 250
-TOPIC_SWEEP = [25,50,75,100,125,150,175,200]
 
 ####################
 ### Imports
@@ -32,13 +45,12 @@ from collections import Counter
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
-from nltk.tokenize import sent_tokenize
-from gensim.models import LdaModel, LdaMulticore, Phrases, HdpModel
-from gensim.models.phrases import Phraser
-from gensim.models.callbacks import CallbackAny2Vec
-from gensim.matutils import Sparse2Corpus
-from sklearn.feature_extraction import DictVectorizer
+import tomotopy as tp
 from scipy import sparse
+import matplotlib.pyplot as plt
+from gensim.models import Phrases
+from nltk.tokenize import sent_tokenize
+from sklearn.feature_extraction import DictVectorizer
 
 ## Local Imports
 try:
@@ -90,11 +102,13 @@ def load_data(filename,
               filters=None,
               min_date=None,
               max_date=None,
-              exclude_ignorable_accounts=True):
+              exclude_ignorable_accounts=True,
+              length_only=False):
     """
 
     """
     data = []
+    length = 0
     with gzip.open(filename,"r") as the_file:
         for line_data in json.load(the_file):
             if exclude_ignorable_accounts and line_data.get("author") in IGNORABLES:
@@ -103,9 +117,14 @@ def load_data(filename,
                 continue
             if max_date is not None and line_data.get("created_utc") >= max_date:
                 continue
+            if length_only:
+                length += 1
+                continue
             if filters:
                 line_data = dict((f, line_data.get(f,None)) for f in filters)
             data.append(line_data)
+    if length_only:
+        return length
     return data
     
 class PostStream(object):
@@ -134,6 +153,26 @@ class PostStream(object):
         self.exclude_ignorable_accounts = exclude_ignorable_accounts
         self.return_metadata = return_metadata
         self.verbose = verbose
+        self._initialize_filenames()
+    
+    def _initialize_filenames(self):
+        """
+
+        """
+        filenames = []
+        wrapper = lambda x: x
+        if self.verbose:
+            print("Isolating Nonempty Files")
+            wrapper = lambda x: tqdm(x, total=len(x), desc="Filesize Filter", file=sys.stdout)
+        for filename in wrapper(self.filenames):
+            lf = load_data(filename,
+                           min_date=self.min_date,
+                           max_date=self.max_date,
+                           exclude_ignorable_accounts=self.exclude_ignorable_accounts,
+                           length_only=True)
+            if lf > 0:
+                filenames.append(filename)
+        self.filenames = filenames
 
     def __iter__(self):
         """
@@ -171,10 +210,17 @@ class PostStream(object):
                         yield tokens
 
 def learn_phrasers(filenames,
-                   verbose=False):
+                   verbose=False,
+                   model_dir=None):
     """
 
     """
+    ## Look for Existing Phrasers
+    if model_dir is not None:
+        try:
+            return load_phrasers(model_dir)
+        except FileNotFoundError:
+            pass
     ## Learn Vocabulary
     vocab_stream = PostStream(filenames,
                               min_date=MIN_DATE,
@@ -187,20 +233,51 @@ def learn_phrasers(filenames,
     ngrams = [2]
     phrasers =  [Phrases(sentences=vocab_stream,
                          max_vocab_size=MAX_VOCAB_SIZE,
-                         threshold=100,
+                         threshold=PHRASE_THRESHOLD,
                          delimiter=" ")]
     current_n = 2
     while current_n < MAX_N_GRAM:
         print(f"Learning {current_n+1}-grams")
         phrasers.append(Phrases(phrasers[-1][vocab_stream],
                                 max_vocab_size=MAX_VOCAB_SIZE,
-                                threshold=100,
+                                threshold=PHRASE_THRESHOLD,
                                 delimiter=" "))
         current_n += 1
         ngrams.append(current_n)
     print("Vocabulary Learning Complete")
+    if model_dir is not None:
+        _ = cache_phrasers(phrasers, ngrams, model_dir)
     return phrasers, ngrams
 
+def cache_phrasers(phrasers,
+                   ngrams,
+                   model_dir):
+    """
+
+    """
+    if not os.path.exists(f"{model_dir}/phrasers/"):
+        _ = os.makedirs(f"{model_dir}/phrasers/")
+    for phraser, ngram in zip(phrasers, ngrams):
+        phraser_file = f"{model_dir}/phrasers/{ngram}.phraser"
+        phraser.save(phraser_file)
+
+def load_phrasers(model_dir):
+    """
+
+    """
+    phraser_files = sorted(glob(f"{model_dir}/phrasers/*.phraser"))
+    if len(phraser_files) == 0:
+        raise FileNotFoundError("No phrasers found in the given model directory.")
+    phrasers = []
+    for pf in phraser_files:
+        pf_ngram = int(os.path.basename(pf).split(".phraser")[0])
+        pf_phraser = Phrases.load(pf)
+        phrasers.append((pf_ngram, pf_phraser))
+    phrasers = sorted(phrasers, key=lambda x: x[0])
+    ngrams = [p[0] for p in phrasers]
+    phrasers = [p[1] for p in phrasers]
+    return phrasers, ngrams
+    
 def initialize_vectorizer(vocabulary):
     """
     Initialize a vectorizer that transforms a counter dictionary
@@ -218,10 +295,17 @@ def initialize_vectorizer(vocabulary):
 def vectorize_data(filenames,
                    phrasers,
                    ngrams,
-                   verbose=True):
+                   verbose=True,
+                   model_dir=None):
     """
 
     """
+    ## Check for Existing Document Term
+    if model_dir is not None:
+        try:
+            return load_document_term(model_dir)
+        except FileNotFoundError:
+            pass
     ## Initialize Stream
     vector_stream = PostStream(filenames,
                                min_date=MIN_DATE,
@@ -256,58 +340,158 @@ def vectorize_data(filenames,
     vmask = list(filter(lambda v: v in top_k, vmask))
     vocab = [vocab[v] for v in vmask]
     X = X[:,vmask]
+    print("Final Vocabulary Size: {}".format(X.shape[1]))
+    ## Cache Document Term
+    if model_dir is not None:
+        _ = cache_document_term(X, post_ids, vocab, model_dir)
     return X, post_ids, vocab
+
+def cache_document_term(X,
+                        post_ids,
+                        vocabulary,
+                        model_dir):
+    """
+
+    """
+    ## Filenames
+    X_filename = f"{model_dir}/data.npz"
+    post_ids_filename = f"{model_dir}/posts.txt"
+    vocabulary_filename = f"{model_dir}/vocabulary.txt"
+    for obj, filename in zip([post_ids, vocabulary],[post_ids_filename,vocabulary_filename]):
+        with open(filename,"w") as the_file:
+            for item in obj:
+                the_file.write(f"{item}\n")
+    sparse.save_npz(X_filename, X)
+
+def load_document_term(model_dir):
+    """
+
+    """
+    ## Establish Filenames and Check Existence
+    X_filename = f"{model_dir}/data.npz"
+    post_ids_filename = f"{model_dir}/posts.txt"
+    vocabulary_filename = f"{model_dir}/vocabulary.txt"
+    for f in [X_filename, post_ids_filename, vocabulary_filename]:
+        if not os.path.exists(f):
+            raise FileNotFoundError(f"Could not find {f}")
+    ## Load
+    X = sparse.load_npz(X_filename)
+    post_ids = [i.strip() for i in open(post_ids_filename,"r")]
+    vocabulary = [i.strip() for i in open(vocabulary_filename,"r")]
+    return X, post_ids, vocabulary
+
+def generate_corpus(X, vocabulary=None):
+    """
+
+    """
+    corpus = tp.utils.Corpus()
+    for x in tqdm(X, total=X.shape[0], desc="Generating Corpus"):
+        xn = x.nonzero()[1]
+        xc = [[i]*j for i, j in zip(xn, x[0, xn].A[0])]
+        xc = [i for j in xc for i in j]
+        if vocabulary is not None:
+            xv = [vocabulary[i] for i in xc]
+        else:
+            xv = list(map(str, xc))
+        corpus.add_doc(xv)
+    return corpus
 
 def main():
     """
 
     """
+    ## Establish Model Directory
+    if not os.path.exists(MODEL_DIR):
+        _ = os.makedirs(MODEL_DIR)
     ## Filenames
-    submission_filenames = sorted(glob(f"{DATA_DIR}raw/AskDocs/submissions/*.json.gz"))[-100:-95]
-    ## Learn Phrasers
-    phrasers, ngrams = learn_phrasers(submission_filenames, verbose=False)
+    submission_filenames = sorted(glob(f"{DATA_DIR}raw/AskDocs/submissions/*.json.gz"))[-100:-70]
+    ## Try To Load Phrasers, Or Learn Them as Fallback
+    phrasers, ngrams = learn_phrasers(submission_filenames,
+                                      verbose=False,
+                                      model_dir=MODEL_DIR)
     ## Get Vectorized Representation
-    X, post_ids, vocabulary = vectorize_data(submission_filenames, phrasers, ngrams, True)
+    X, post_ids, vocabulary = vectorize_data(filenames=submission_filenames,
+                                             phrasers=phrasers,
+                                             ngrams=ngrams,
+                                             verbose=False,
+                                             model_dir=MODEL_DIR)
     id2word = dict(zip(range(X.shape[1]), vocabulary))
-    ## Split Train/Test
-    splits = np.array(list(map(lambda i: True if np.random.rand() < 0.8 else False, range(X.shape[0]))))
-    X_train = X[splits.nonzero()[0]]
-    X_test = X[np.logical_not(splits).nonzero()[0]]
-    ## Fit Model
-    results = []
+    ## Drop Examples Without Vocabulary
+    sample_mask = np.nonzero(X.getnnz(axis=1) > 0)[0]
+    X = X[sample_mask]
+    post_ids = [post_ids[sm] for sm in sample_mask]
+    ## Transform Matrix to Vocabulary
+    corpus = generate_corpus(X, vocabulary)
+    ## Initialize Model
+    model = tp.HDPModel(corpus=corpus,
+                        initial_k=INITIAL_K,
+                        alpha=ALPHA_PRIOR,
+                        eta=ETA_PRIOR,
+                        gamma=GAMMA_PRIOR,
+                        seed=RANDOM_SEED)
+    ## Fit Model using Gibbs Sampler
+    print("Beginning Model Training")
+    params = np.zeros((MODEL_N_ITER, 5))
+    for iteration in tqdm(range(MODEL_N_ITER), total=MODEL_N_ITER, desc="MCMC", file=sys.stdout):
+        model.train(1, workers=NUM_JOBS)
+        params[iteration] = np.array([model.k, model.live_k, model.alpha, model.gamma, model.ll_per_word])
+    live_topics = [i for i in range(model.k) if model.is_live_topic(i)]
+    params = pd.DataFrame(params, columns=["k","live_k","alpha","gamma","ll"])
+    params.to_csv(f"{MODEL_DIR}/hdp.mcmc.csv",index=False)
+    ## Trace Plots
+    fig, ax = plt.subplots(2, 2, figsize=(10,5.6),sharex=True)
+    ax[0,0].plot(params["k"], label="K", color="C0", alpha=0.8)
+    ax[0,0].plot(params["live_k"], label="Active K", color="C1", alpha=0.8)
+    ax[0,1].plot(params["alpha"], color="C2", alpha=0.8)
+    ax[1,0].plot(params["gamma"], color="C3", alpha=0.8)
+    ax[1,1].plot(params["ll"], color="black", alpha=0.8)
+    ax[0,0].legend(loc="lower right", fontsize=13)
+    for i in range(2):
+        ax[1,i].set_xlabel("MCMC Iteration")
+        for j in range(2):
+            ax[i,j].spines["right"].set_visible(False)
+            ax[i,j].spines["top"].set_visible(False)
+            ax[i,j].tick_params(labelsize=10)
+    ax[0,0].set_title("# Components")
+    ax[0,1].set_title("$\\alpha$")
+    ax[1,0].set_title("$\\gamma$")
+    ax[1,1].set_title("Log-Likelihood")
+    fig.tight_layout()
+    fig.savefig(f"{MODEL_DIR}trace.png",dpi=300)
+    plt.close(fig)
+    ## Save the model
+    _ = model.save(f"{MODEL_DIR}/hdp.model")
+    _ = model.summary(file=open(f"{MODEL_DIR}/hdp.summary.txt","w"), topic_word_top_n=20)
+    with open(f"{MODEL_DIR}/hdp.summary.txt","a") as the_file:
+        the_file.write("Live Topics: {}".format(", ".join(list(map(str, live_topics)))))
+    ## Extract Topic Distribution
+    print("Caching Topic Distribution")
+    topic_word_dist = np.vstack([model.get_topic_word_dist(topic) for topic in live_topics])
+    topic_terms = []
+    for i, dist in enumerate(topic_word_dist):
+        dist_sorting = np.argsort(dist)[::-1][:CACHE_TOP_K]
+        dist_sorting_vocab = [[vocabulary[d], float(dist[d])] for d in dist_sorting]
+        topic_terms.append({"topic":i, "terms":dist_sorting_vocab})
+    with open(f"{MODEL_DIR}topic_terms.json","w") as the_file:
+        for tt in topic_terms:
+            _ = the_file.write(f"{json.dumps(tt)}\n")
+    ## Topic Assignments
+    print("Caching Topic Assignments")
+    doc_topic_dist = np.vstack([doc.get_topic_dist() for doc in model.docs])[:,live_topics]
+    topic_assignments = []
+    for post_id, doc in zip(post_ids, doc_topic_dist):
+        doc_topics = [[int(d), float(doc[d])] for d in doc.nonzero()[0]]
+        topic_assignments.append({"id":post_id, "topics":doc_topics})
+    with open(f"{MODEL_DIR}topic_assignments.json","w") as the_file:
+        for ta in topic_assignments:
+            _ = the_file.write(f"{json.dumps(ta)}\n")
+    print("Script Complete.")
 
-    
-    model = HdpModel(corpus=Sparse2Corpus(X_train, False),
-                     id2word=id2word,
-                     random_state=42,
-                     max_chunks=(X_train.shape[0] // 256) * 100,
-                     chunksize=256)
-    model = model.suggested_lda_model()
-    hdp_p_train = model.log_perplexity(Sparse2Corpus(X_train, False))
-    hdp_p_test = model.log_perplexity(Sparse2Corpus(X_test, False))
-    
+##################
+### Execution
+##################
+
+if __name__ == "__main__":
+    _ = main()
 
 
-    for j, k in enumerate(TOPIC_SWEEP):
-        print(f"Training Model {j+1}/{len(TOPIC_SWEEP)} with {k} topics")
-        ## Fit Model
-        model = LdaMulticore(corpus=Sparse2Corpus(X_train, False),
-                             id2word=id2word,
-                             num_topics=k,
-                             passes=1000,
-                             workers=8,
-                             alpha="symmetric",
-                             eta="auto",
-                             random_state=42,
-                             iterations=100)
-        ## Perplexity
-        p_train = model.log_perplexity(Sparse2Corpus(X_train, False))
-        p_test = model.log_perplexity(Sparse2Corpus(X_test, False))
-        ## Topics
-        model_topics = []
-        for topic in range(k):
-            topic_terms = [id2word[i[0]] for i in model.get_topic_terms(topic,20)]
-            model_topics.append(topic_terms)
-        ## Cache
-        results.append((k, p_train, p_test, model_topics))
-        

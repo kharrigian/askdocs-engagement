@@ -9,3 +9,4 @@ gensim
 nltk
 python-Levenshtein
 scikit-learn
+tomotopy
