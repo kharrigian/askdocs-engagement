@@ -1,0 +1,398 @@
+flair,is_health_professional,is_physician,is_student
+This user has not yet been verified.,False,False,False
+Physician,True,True,False
+Medical Student,True,True,True
+Dermatologist | Top Contributor,True,True,False
+Physician | Top Contributor,True,True,False
+Physician | Moderator,True,True,False
+Dermatologist,True,True,False
+Physician | Moderator | Top Contributor,True,True,False
+Registered Nurse,True,False,False
+"B.S., Medical Lab Sciences",True,False,False
+Surgeon,True,True,False
+Surgeon | Moderator,True,True,False
+Physician - Heme/Onc,True,True,False
+Physician - Dermatologist | Top Contributor,True,True,False
+Physician - Peds GI,True,True,False
+Orthopaedic Surgeon,True,True,False
+"Physician, Neurology | Moderator",True,True,False
+Physician - Ophthalmologist,True,True,False
+Physician - ENT,True,True,False
+Physician - Pathologist,True,True,False
+Physician - Neuroradiology,True,True,False
+Physician - Emergency Medicine,True,True,False
+Emergency Physician,True,True,False
+EMT,True,False,False
+"Physician, Family Medicine Resident",True,True,False
+ Registered nurse,True,False,False
+Neonatal Nurse Practitioner,True,False,False
+Physician - Surgeon,True,True,False
+Pharmacist,True,False,False
+Pharmacy Student,True,False,True
+Medical student,True,False,False
+Nurse Practitioner,True,False,False
+Clinical Counselor,True,False,False
+Nursing Student,True,False,True
+"Physician, Emergency Medicine | Moderator",True,True,False
+Psychiatrist,True,True,False
+Physician Assistant,True,False,False
+Doctor,True,True,False
+ Registered Nurse,True,False,False
+MD - Peds GI | Top Contributor,True,True,False
+Paramedic,True,False,False
+Emergency Medicine Physician,True,True,False
+OTR/L,True,False,False
+IM/Peds Physician,True,True,False
+Internal Medicine,True,True,False
+"Nursing Graduate, RPN",True,False,True
+Physician - Family Medicine,True,True,False
+Physician - Urologist,True,True,False
+Radiologist,True,True,False
+EMT-B,True,False,False
+Physician - Critical Care,True,True,False
+Anesthesiologist,True,True,False
+Medical Technologist - Microbiology,True,False,False
+Physician - General Surgery,True,True,False
+ER Physician,True,True,False
+ Physician - Radiologist,True,True,False
+Physician - Neurologist,True,True,False
+Occupational Therapist,True,False,False
+EM/IM Physician | Moderator,True,True,False
+Physician - Anesthesiology,True,True,False
+Clinical Chemist,True,False,False
+"Physician, IM/Peds | Moderator",True,True,False
+Physical Therapist,True,False,False
+"Physician, Internal Medicine | Moderator",True,True,False
+"Physician - IM/Peds, | Moderator",True,True,False
+Physician - Internal Medicine,True,True,False
+RN,True,False,False
+OBGYN Physician,True,True,False
+"Physician, Pediatrics",True,True,False
+Diagnostic Sonographer,True,False,False
+Physician - Pediatrician,True,True,False
+Physician - Urology,True,True,False
+Otolaryngologist (ENT),True,True,False
+Physician - IM/ID/Peds,True,True,False
+Emergency Medical Technician,True,False,False
+Physician - Anesthetist/Intensivist,True,True,False
+Psychologist,True,False,False
+Registered Nurse | Moderator | Top Contributor,False,True,False
+Emergency Medicine Physician | Top Contributor,True,True,False
+Physician - Internist,True,True,False
+Physician - Radiologist,True,True,False
+"Physician, Anesthesiology",True,True,False
+FY1 Doctor,True,True,True
+Physician - cardiologist ,True,True,False
+Otolaryngologist,True,True,False
+Physician/Neurosurgeon,True,True,False
+EM/IM Physician | Moderator ,True,True,False
+Physician - Cardiology ,True,True,False
+Gynecologist,True,True,False
+Respiratory Therapist,True,False,False
+Nursing Doctorate,True,False,True
+Path Asst/Med Lab Tech,True,False,False
+Dentist,True,True,False
+EM Resident,True,True,False
+Registered Nurse - Moderator - Top Contributor ,True,False,False
+Healthcare Assistant - Emergency Department,True,False,False
+"Resident Physician, Emergency Medicine",True,True,False
+Sports Massage Therapist,True,False,False
+Speech Pathologist,True,False,False
+MD - Clinical Pharmacologist,True,True,False
+Nurse,True,False,False
+Physician - Family Medicine ,True,True,False
+Physician - Dermatologist,True,True,False
+Rheumatology Research Fellow,True,False,False
+Neurologist,True,True,False
+Ophthalmologist ,True,True,False
+Cardiac Sonographer,True,False,False
+LPN,True,False,False
+Physician Associate (PA),True,False,False
+Physician - OBGYN,True,True,False
+Physician - Neurology,True,True,False
+BSN-RN,True,False,False
+Licensed Vocational Nurse,True,False,False
+Physician Associate (PA) Student,True,False,True
+Urologist,True,True,False
+Clinical Chemistry PhD,True,False,False
+Emergency Medical Responder,True,False,False
+Podiatrist,True,True,False
+Speech Language Pathologist,True,False,False
+Midwife,True,False,False
+Clinical Psychologist,True,False,False
+"Paramedic, B.S. Paramedicine",True,False,False
+Physician ,True,True,False
+Dr. of Acupuncture/Oriental Medicine,True,True,False
+Registered Midwife,True,False,False
+Physician - Psychiatrist,True,True,False
+Epidemiologist,True,False,False
+Advanced EMT,True,False,False
+ENT,True,True,False
+ID Physician,True,True,False
+Behavioral Technician,True,False,False
+Medical Laboratory Technologist,True,False,False
+Founder,False,False,False
+ICU RN,True,False,False
+Medical Laboratory Scientist,True,False,False
+Registered Practical Nurse,True,False,False
+"Physician, Internal Medicine",True,True,False
+Physician - ENT/Head &amp; Neck Surgery,True,True,False
+student paramedic,True,False,True
+Fellow Physician - Neurology ,True,True,False
+PharmD / Med Student,True,True,True
+Ophthalmologist,True,True,False
+Medical Assistant,True,False,False
+Physician - Anesthesiologist,True,True,False
+PhD Biobehavioral Health,True,False,False
+Physician - Internal Medicine &amp; Pediatrics,True,True,False
+"D.O., Trauma Surgery",True,True,False
+Pharmacy Tech/Medical Assistant,True,False,False
+"Physician, Surgery Resident",True,True,False
+Orthopedic Surgeon,True,True,False
+Radiologic Technologist,True,False,False
+Biomedical Student,False,False,True
+CCRN,True,False,False
+Paramedic student,True,False,True
+Resident Physician PGY1 | Moderator,True,True,False
+PhD. Molecular Chemistry/Medical Student,True,True,True
+Physician - IM/Peds,True,True,False
+Physician - Cardiology,True,True,False
+Neurosurgeon,True,True,False
+PharmD,True,False,False
+Pharmacy Intern,True,False,True
+Physician - Neurosurgery,True,True,False
+Internal Medicine Physician,True,True,False
+NP Student,True,False,True
+Med School,True,True,True
+Physician Assistant Student,True,False,True
+"Physician, General Surgery",True,True,False
+Physician - Pediatrics,True,True,False
+PA - Family Med,True,False,False
+Speech Language Therapist,True,False,False
+Chiropractor Student,True,False,True
+Physician and former athletic trainer,True,True,False
+Internal Medicine Resident,True,True,False
+Medical Specialist,True,False,False
+Speech-Language Pathologist,True,False,False
+Physician | Women's Health,True,True,False
+Interventional Radiologist,True,True,False
+PsyD Student,True,False,True
+Social Worker - LCSW,True,False,False
+"Resident Physician, Med/Peds",True,True,False
+Physician - Pulmonologist,True,True,False
+M.D.,True,True,False
+"Physician, Emergency Medicine",True,True,False
+Physician - Surgery,True,True,False
+Medical Intern,True,True,False
+Medical student ,True,True,True
+Certified Nurse Midwife,True,False,False
+Physician - Pulm &amp; Critical Care,True,True,False
+Not a medical professional,False,False,False
+Physical Therapist (DPT),True,False,False
+General Practitioner,True,True,False
+Psychiatric Nurse Practitioner,True,False,False
+Bachelor of Biomedicine,True,False,False
+"Physician, Emergency Medicine &amp; Internal Medicine",True,True,False
+Physical Therapist ,True,False,False
+Physician - Emergency Medicine &amp; Internal Medicine| Moderator ,True,True,False
+Family Physician,True,True,False
+Pharmacist and Medical Student,True,True,True
+"MSW, psychotherapist",True,False,False
+Pediatric Nurse Practitioner,True,False,False
+Surgical Technologist &amp; EMT-B,True,False,False
+Peds Crit Care,True,True,False
+Vascular Sonographer (Ultrasound),True,False,False
+"Physician, Psychiatry",True,True,False
+Physician - Diagnostic Radiology,True,True,False
+Army Healthcare Specialist,True,False,False
+"BSN, Emergency Medicine",True,False,False
+Pharmacy Tech,True,False,False
+Social Worker/LCSW,True,False,False
+Physician - forensic pathology ,True,True,False
+Psychologist ,True,False,False
+Med student,True,True,True
+Physician - Medicine/Pediatrics,True,True,False
+Physician - Pathology,True,True,False
+Midwifery Student,True,False,True
+Pharmacy Technician,True,False,False
+Cardiologist,True,True,False
+Surgical Technologist,True,False,False
+"PhD, Prof. of Physiology and Neuroscience",True,False,False
+Family Nurse Practitioner,True,False,False
+SLP,True,False,False
+Medical Pathology Scientist,True,False,False
+Physiotherapist,True,False,False
+Histopathologist,True,True,False
+Respiratory Therapist/ECMO Specialist ,True,False,False
+Physician - IM,True,True,False
+MHW/EMT-I,True,False,False
+Registered Nurse | Moderator,True,False,False
+Pediatrician - Neonatology,True,True,False
+Social Worker,True,False,False
+Physical Therapy Student,True,False,True
+PA Student | M.A. Clinical Psychology,True,False,True
+Registered Medical Assistant,True,False,False
+Neurosurgery resident,True,True,False
+"EMT, Army Medic",True,False,False
+Physician - Otolaryngology,True,True,False
+M.D. - Anesthesiologist,True,True,False
+Nurse Aide,True,False,False
+ Radiologic Technologist,True,False,False
+Pharm.D. Student,True,False,True
+"Physician, Cardiology",True,True,False
+M.D. - Orthopedics,True,True,False
+Licensed Professional Counselor,True,False,False
+Orthopedic Technologist,True,False,False
+Pathologists' Assistant,True,False,False
+Registered nurse,True,False,False
+ED RN,True,False,False
+Diagnostic Medical Sonographer,True,False,False
+Physician - Family Medicine | Moderator,True,True,False
+verified-altdoc,False,True,False
+Ophthalmic Assistant,True,False,False
+Registered Dietitian,True,False,False
+"Registered Nurse, Cardiac Cath Lab",True,False,False
+Medical Lab Professional,True,False,False
+Pharm.D.,True,False,False
+Adult-Gerontological Primary Care Nurse Practitioner,True,False,False
+Paramedic Student,True,False,True
+Genetic Counselor,True,False,False
+Medical Imaging Technologist,True,False,False
+Nursing student,True,False,True
+Clinical Research Nurse,True,False,False
+Physician - Dermatology,True,True,False
+General Surgeon,True,True,False
+Assistant Lab Researcher,True,False,False
+Student Radiographer,True,False,True
+"Resident Physician, Med/Peds | Moderator",True,True,False
+Medical Student ,True,True,True
+"Pediatrician, Infectious Disease",True,True,False
+Ob/gyn MD,True,True,False
+Medical Laboratory Technician,True,False,False
+Anesthesiologist Assistant,True,False,False
+"DNP, NP-C",True,False,False
+Physician Assistant - Radiology,True,False,False
+M.A. Clinical Psychology,True,False,False
+Pediatrician,True,True,False
+First Responder,True,False,False
+Physician - Cardiologist,True,True,False
+Mental health therapist,True,False,False
+Vascular Surgeon,True,True,False
+Doctorate in Public Health,True,False,False
+Physician - Pulmonary/Critical Care Fellow,True,True,False
+PA Student ,True,False,True
+Ultrasound Technician,True,False,False
+Physician - Radiology,True,True,False
+Physician - Peds EM,True,True,False
+Physician - Orthopedic Surgeon,True,True,False
+mental health worker,True,False,False
+Psychotherapist ,True,False,False
+Endoscopy tech,True,False,False
+Physician - Internal Medicine + Pediatrics,True,True,False
+Physician - Ob/Gyn,True,True,False
+"D.O., Neurology Resident",True,True,False
+OR Nurse,True,False,False
+medical_student,True,True,True
+Physicians Assistant,True,False,False
+Dentist - Oral and Maxillofacial Surgeon,True,True,False
+Physician - Otolaryngology/Head &amp; Neck Surgery,True,True,False
+medical student,True,True,True
+slp,True,False,False
+BSN Student,True,False,True
+Specialist Radiographer,True,False,False
+Diagnostic Medical Sonographer (Ultrasound),True,False,False
+Clinical Microbiologist,True,False,False
+Doctor of Physical Therapy,True,False,False
+Physician - Pulm Crit,True,True,False
+OT student,True,False,True
+Licensed Genetic Counselor,True,False,False
+Psychologist (PsyD),True,False,False
+PA Student,True,False,True
+BSN student,True,False,True
+Medical Sttudent,True,True,True
+AEMT,True,False,False
+Biochemist ,True,False,False
+Genetics Counselor,True,False,False
+Pediatric Dentist,True,True,False
+Mammographer,True,False,False
+Gastroenterology Fellow Physician,True,True,False
+Mental Health Professional,True,False,False
+"PhD, Pathology",True,False,False
+Web Developer,False,True,False
+Physician - OB/GYN,True,True,False
+Therapist,True,False,False
+Physician - rad onc,True,True,False
+WEB DEVELOPER,False,True,False
+Biomedical Scientist,True,False,False
+"Physical Therapist, DPT",True,False,False
+"PhD, Pharmacology Researcher",True,False,False
+Podiatry Student,True,False,True
+Patient Care Technician,True,False,False
+Dialysis Technician,True,False,False
+Registered Dietician,True,False,False
+Physician - Critical Care &amp; Sleep Medicine,True,True,False
+RN Student,True,False,False
+EMT/Medical Student,True,True,True
+Certified Registered Nurse Anesthetist,True,False,False
+Histology Technician,True,False,False
+DPT Student,True,False,True
+Surgeon - Trauma/Critical Care,True,True,False
+Physician Assistant (PA-C),True,False,False
+Nursing student ,True,False,True
+Student nurse,True,False,True
+Physician - Psychiatry,True,True,False
+Pharmacist (MPh),True,False,False
+Physician - Oncology,True,True,False
+Physician - Hematology/Oncology,True,True,False
+Licensed Clinical Social Worker,True,False,False
+Medical Student`,True,True,True
+Chiropractor,True,False,False
+Atheletic Trainer,True,False,False
+Medical technologist - microbiology,True,False,False
+MLS Transfusion Med,True,False,False
+Optometrist,True,False,False
+Speech Lang Path,True,False,False
+AI health technology,False,True,False
+Flight Paramedic,True,False,False
+Dental Assistant,True,False,False
+Physician - Pulm/crit,True,True,False
+Physician/Moderator,True,True,False
+Certified Nurse Aid/Premed,True,False,True
+Moderator,False,True,False
+MD/PhD student,True,True,True
+Physician and Surgeon,True,True,False
+Test Flair - Physician,False,True,False
+Chat Operator | Developer,False,True,False
+ Registered Respiratory Therapist,True,False,False
+Nursing  Student,True,False,True
+Audiologist,True,False,False
+Masters in Nutrition/Dietician,True,False,False
+Radiographer,True,False,False
+Registered Nurse - PA student,True,False,True
+Pharm.D. - Hospital Pharmacist,True,False,False
+Medical Lab Technician,True,False,False
+Army Medic,True,False,False
+Geriatrician,True,True,False
+Army Combat Medic/EMT,True,False,False
+Biomedical Engineering,True,False,False
+Medical Studen,True,True,True
+Resp Therapy Student,True,False,True
+general surgery,True,True,False
+Histotechnologist,True,False,False
+PA-C,True,False,False
+"EMT, BSN Student",True,False,True
+Public Health Physician,True,True,False
+Pediatric Resident ,True,True,False
+Pharmacist (PharmB),True,False,False
+Registered Nurse - Behavioral Health,True,False,False
+Physician - Interventional Radiologist,True,True,False
+Physician Assistant - Emergency,True,True,False
+Forensic Nurse,True,False,False
+Physician - dermatology,True,True,False
+Physician - Radiation Oncology,True,True,False
+Certified Pharmacy Technician,True,False,False
+Prosthetist,True,False,False
+"Medical Student, Paramedic",True,True,True
+Physician - Visceral Surgery,True,True,False
+Registered Nurse - ICU,True,False,False
+Certified Counselor,True,False,False
