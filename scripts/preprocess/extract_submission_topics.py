@@ -470,7 +470,7 @@ def main():
     topic_terms = []
     for i, dist in enumerate(topic_word_dist):
         dist_sorting = np.argsort(dist)[::-1][:CACHE_TOP_K]
-        dist_sorting_vocab = [[vocabulary[d], float(dist[d])] for d in dist_sorting]
+        dist_sorting_vocab = [[model.used_vocabs[d], float(dist[d])] for d in dist_sorting]
         topic_terms.append({"topic":i, "terms":dist_sorting_vocab})
     with open(f"{MODEL_DIR}topic_terms.json","w") as the_file:
         for tt in topic_terms:
