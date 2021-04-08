@@ -1,6 +1,7 @@
 ## Data
 data/raw/AskDocs
 data/processed/*.csv
+data/processed/models
 
 ## Documentation
 documentation/*.pdf
