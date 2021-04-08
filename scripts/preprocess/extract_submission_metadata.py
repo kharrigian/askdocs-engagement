@@ -407,7 +407,7 @@ def main():
     metadata_df = metadata_df.copy()
     metadata_df.index.name = "id"
     ## Dump
-    metadata_df.to_csv(f"{DATA_DIR}processed/metadata.csv",index=True)
+    metadata_df.to_csv(f"{DATA_DIR}processed/submission_metadata.csv",index=True)
     print("Script Complete")
 
 ###################
