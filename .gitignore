@@ -8,6 +8,7 @@ documentation/*.pdf
 
 ## Plots
 plots/summary_statistics/
+plots/metadata_distributions/
 
 ## Code
 scripts/utilities/legacy
