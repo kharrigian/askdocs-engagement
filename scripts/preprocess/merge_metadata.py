@@ -77,7 +77,7 @@ def time_to_events(sub_metadata,
     submission_created = datetime.fromtimestamp(sub_metadata.get("created_utc"))
     timings = {}
     for measure in [c for c in com_metadata.keys() if "min_created_utc" in c]:
-        timing_measure = "time_to_{}".format(measure[16:])
+        timing_measure = "time_to{}_first_response".format(measure[15:]) 
         if np.isnan(com_metadata[measure]):
             timings[timing_measure] = None
         else:
@@ -134,6 +134,8 @@ def merge_metadata(submission_id):
     ## Check for Missing Submission
     if sub_metadata is None:
         return None
+    ## Add Any Response Binary Indicator
+    com_metadata["received_any_response"] = com_metadata["n_response"] > 0
     ## Get Topics
     sub_topics = submission_topic_assignments.get(submission_id, [])
     sub_topics_grouped = {}

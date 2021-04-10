@@ -33,7 +33,7 @@ from tqdm import tqdm
 ####################
 
 ## Data
-DATA_DIR = f"./data/raw/AskDocs/"
+DATA_DIR = f"./data/"
 
 ## Dates
 MIN_DATE = "2017-01-01"; MIN_DATE = int(datetime.strptime(MIN_DATE, "%Y-%m-%d").timestamp())
@@ -290,7 +290,7 @@ def _find_race(post, text_fields):
 
     """
     ## Clean Text and Get ID
-    post_text = clean_text(post, 'race')
+    post_text = clean_text(post, 'race', text_fields)
     post_id = post.get("id")
     ## Find Matches
     patt_match = []
@@ -378,7 +378,7 @@ def main():
     automod_format = check_automod(submission_stream)
     ## Demographic Labeling
     demographic_labels = {"gender":{},"age":{},"race":{}}
-    for field, text_fields in zip(["title","selftext","all"],[["title"],["seltext"],["title","selftext"]]):
+    for field, text_fields in zip(["title","selftext","all"],[["title"],["selftext"],["title","selftext"]]):
         print(f"Getting Labels in {field}")
         for func, demo in zip([_find_gender,_find_age,_find_race],["gender","age","race"]):
             demographic_labels[demo][field] = label_demo(submission_stream, func, demo, text_fields)
