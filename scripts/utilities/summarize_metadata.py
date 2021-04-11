@@ -5,6 +5,7 @@ Analyze the merged metadata that will be used for modeling
 
 ## Meta Parameters
 APPLY_DATE_FILTER = False
+APPLY_AUTOMOD_FILTER = True
 MIN_DATE = "2019-01-01"
 MAX_DATE = "2021-01-01"
 
@@ -72,10 +73,16 @@ def bootstrap(x,
     """
 
     """
+    if len(x) == 0 or np.isnan(x).all():
+        return return_type([np.nan,np.nan,np.nan])
     q = aggfunc(x)
     cache = np.zeros(n_iter)
     for n in range(n_iter):
-        cache[n] = aggfunc(np.random.choice(x, replace=True, size=len(x)))
+        samp = np.random.choice(x, replace=True, size=len(x))
+        if np.isnan(samp).all():
+            cache[n] = np.nan
+        else:
+            cache[n] = aggfunc(samp)
     q_ = np.percentile(q - cache, q=[alpha*100/2, 100-(alpha*100/2)])
     q_ = [q+q_[0], q, q+q_[1]]
     q_ = return_type(q_)
@@ -201,6 +208,11 @@ X["created_utc_dt"] = X["created_utc"].map(datetime.fromtimestamp)
 
 ## Merge DataFrames
 data_df = pd.merge(X, Y, left_index=True, right_index=True)
+
+## Ignore Posts Removed by Automoderator
+if APPLY_AUTOMOD_FILTER:
+    data_df = data_df.loc[~(data_df["post_removed_missing_detail"].fillna(False))&
+                          ~(data_df["post_removed_emergency"].fillna(False))].copy()
 
 #####################
 ### Visualization

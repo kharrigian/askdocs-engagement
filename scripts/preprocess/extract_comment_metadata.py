@@ -39,11 +39,8 @@ MIN_DATE = "2017-01-01"; MIN_DATE = int(datetime.strptime(MIN_DATE, "%Y-%m-%d").
 MAX_DATE = "2021-04-01"; MAX_DATE = int(datetime.strptime(MAX_DATE, "%Y-%m-%d").timestamp())
 
 ## Accounts to Ignore
-IGNORABLES = set([
-    "AutoModerator",
-    "[deleted]",
-    "[removed]"
-])
+DELETED = "[deleted]"
+AUTOMOD = "AutoModerator"
 
 ## Flair Map
 FLAIR_MAP = pd.read_csv(f"{DATA_DIR}/resources/flair_mapping.csv")
@@ -62,7 +59,6 @@ def load_data(filename,
               filters=None,
               min_date=None,
               max_date=None,
-              exclude_ignorable_accounts=True,
               length_only=False):
     """
 
@@ -71,8 +67,6 @@ def load_data(filename,
     length = 0
     with gzip.open(filename,"r") as the_file:
         for line_data in json.load(the_file):
-            if exclude_ignorable_accounts and line_data.get("author") in IGNORABLES:
-                continue
             if min_date is not None and line_data.get("created_utc") < min_date:
                 continue
             if max_date is not None and line_data.get("created_utc") >= max_date:
@@ -97,7 +91,6 @@ class PostStream(object):
                  filenames,
                  min_date=None,
                  max_date=None,
-                 exclude_ignorable_accounts=True,
                  jobs=1,
                  kind="post"):
         """
@@ -107,7 +100,6 @@ class PostStream(object):
         self.min_date = min_date
         self.max_date = max_date
         self.jobs = jobs
-        self.exclude_ignorable_accounts = exclude_ignorable_accounts
         self.kind = kind
         assert self.kind in set(["post","file"])
         self._initialize_len()
@@ -121,8 +113,7 @@ class PostStream(object):
         return i, load_data(filename,
                             length_only=True,
                             min_date=self.min_date,
-                            max_date=self.max_date,
-                            exclude_ignorable_accounts=self.exclude_ignorable_accounts)
+                            max_date=self.max_date)
 
     def _initialize_len(self):
         """
@@ -161,7 +152,6 @@ class PostStream(object):
             data = load_data(f,
                              min_date=self.min_date,
                              max_date=self.max_date,
-                             exclude_ignorable_accounts=self.exclude_ignorable_accounts,
                              length_only=False)
             if self.kind == "post":
                 for post in data:
@@ -179,7 +169,7 @@ def get_comment_metadata(posts):
     """
 
     """
-    ## Add Provider Status
+    ## Add Provider Status and Other Metadata
     submission_id = None
     for post in posts:
         post["provider_status"] = categorize_flair(post)
@@ -187,19 +177,33 @@ def get_comment_metadata(posts):
             submission_id = post["link_id"].split("_")[1]
         if post["link_id"].split("_")[1] != submission_id:
             raise ValueError("Found mismatched comments.")
+        if post["author"] == AUTOMOD:
+            post["automod_removal_reason"] = automod_comment_removed(post["body"])
+            post["is_automod"] = True
+            post["is_deleted"] = False
+        else:
+            post["automod_removal_reason"] = None
+            post["is_automod"] = False
+            post["is_deleted"] = post["author"] == DELETED
+    ## Filter Posts
+    posts_deleted = [p for p in posts if p.get("is_deleted")]
+    posts_valid = [p for p in posts if not p.get("is_automod") and not p.get("is_deleted")]
     ## Overall Metadata
     comment_metadata = {
-        "n_response":len(posts),
-        "n_unique_responders":len(set(p.get("author") for p in posts)),
+        "n_response":len(posts_valid),
+        "n_response_deleted":len(posts_deleted),
+        "n_unique_responders":len(set(p.get("author") for p in posts_valid)),
+        "post_removed_missing_detail":any(p["automod_removal_reason"] is not None and p["automod_removal_reason"]=="missing_detail" for p in posts),
+        "post_removed_emergency":any(p["automod_removal_reason"] is not None and p["automod_removal_reason"]=="emergency_advice" for p in posts),
         "received_physician_response":any(p["provider_status"]=="physician" for p in posts),
         "received_physician_in_training_response":any(p["provider_status"]=="physician_in_training" for p in posts),
         "received_non_physician_provider_response":any(p["provider_status"]=="non_physician_provider" for p in posts),
         "received_non_physician_provider_in_training_response":any(p["provider_status"]=="non_physician_provider_in_training" for p in posts),
-        "min_created_utc":min(p.get("created_utc") for p in posts),
-        "min_created_utc_physician":min([p.get("created_utc") for p in posts if p["provider_status"]=="physician"]+[np.inf]),
-        "min_created_utc_non_physician_provider":min([p.get("created_utc") for p in posts if p["provider_status"]=="non_physician_provider"]+[np.inf]),
-        "min_created_utc_physician_in_training":min([p.get("created_utc") for p in posts if p["provider_status"]=="physician_in_training"]+[np.inf]),
-        "min_created_utc_non_physician_provider_in_training":min([p.get("created_utc") for p in posts if p["provider_status"]=="non_physician_provider_in_training"]+[np.inf]),
+        "min_created_utc":min(p.get("created_utc") for p in posts_valid +[{"created_utc":np.inf}]),
+        "min_created_utc_physician":min([p.get("created_utc") for p in posts_valid if p["provider_status"]=="physician"]+[np.inf]),
+        "min_created_utc_non_physician_provider":min([p.get("created_utc") for p in posts_valid if p["provider_status"]=="non_physician_provider"]+[np.inf]),
+        "min_created_utc_physician_in_training":min([p.get("created_utc") for p in posts_valid if p["provider_status"]=="physician_in_training"]+[np.inf]),
+        "min_created_utc_non_physician_provider_in_training":min([p.get("created_utc") for p in posts_valid if p["provider_status"]=="non_physician_provider_in_training"]+[np.inf]),
     }
     comment_metadata["received_any_provider_response"] = any(comment_metadata[i] for i in ["received_physician_response","received_non_physician_provider_response","received_physician_in_training_response","received_non_physician_provider_in_training_response"])
     if comment_metadata["received_any_provider_response"]:
@@ -213,6 +217,28 @@ def get_comment_metadata(posts):
             comment_metadata[x] = None
     return submission_id, comment_metadata
 
+def automod_comment_removed(text):
+    """
+
+    """
+    ## Reasons
+    insufficient_reasons = [
+        "removed due to insufficient demographic",
+        "did not abide to our detailed submissions",
+        "does not contain enough information",
+    ]
+    disregard_rules = [
+        "do not allow question about emergencies"
+    ]
+    ## Look for Reasons
+    for i in insufficient_reasons:
+        if i in text:
+            return "missing_detail"
+    for i in disregard_rules:
+        if i in text:
+            return "emergency_advice"
+    return "other"
+
 def main():
     """
 
@@ -222,7 +248,6 @@ def main():
     comment_stream = PostStream(comment_files,
                                 min_date=MIN_DATE,
                                 max_date=MAX_DATE,
-                                exclude_ignorable_accounts=True,
                                 jobs=NUM_JOBS * 2 - 1,
                                 kind="file")
     ## Get Comment Metadata
@@ -243,5 +268,5 @@ def main():
 ### Execution
 ##################
 
-# if __name__ == "__main__":
-#     _ = main()
+if __name__ == "__main__":
+    _ = main()
