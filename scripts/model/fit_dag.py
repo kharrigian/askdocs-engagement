@@ -29,6 +29,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from scipy import stats
 import matplotlib.pyplot as plt
 import statsmodels.api as sm
 from ananke import graphs, models, estimation
@@ -77,6 +78,13 @@ DV_VARIABLE_TYPES = {'n_response': "ordinal",
                      'time_to_physician_in_training_first_response': "continous",
                      'time_to_non_physician_provider_in_training_first_response': "continous",
                      'time_to_any_provider_response_first_response': "continous"}
+
+## Codebook
+weekday_map = dict((i, w) for i, w in enumerate(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]))
+month_map = dict((i,m) for i, m in enumerate(["January","February","March","April","May","June","July","August","September","October","November","December"]))
+race_map = dict((i,r) for i, r in enumerate(["white","black","hispanic","asian","indian","mixed","middle_eastern","pacific_islander"]))
+gender_map = {0:"male",1:"female"}
+topic_map = dict()
 
 ## Plot Directory
 if not os.path.exists(PLOT_DIR):
@@ -166,6 +174,120 @@ def convert_to_one_hot(X,
     X = X.drop(covariate,axis=1)
     X = pd.merge(X, X_one_hot, left_index=True, right_index=True)
     return X, one_hot_columns
+
+def _format_feature_names(feature_names, mapping):
+    """
+
+    """
+    feature_names_formatted = []
+    for f in feature_names:
+        find = int(f.split("_")[-1])
+        feature_names_formatted.append(mapping[find])
+    return feature_names_formatted
+
+
+def format_feature_names(features, variable_type):
+    """
+
+    """
+    if variable_type == "gender":
+        feature_labels = _format_feature_names(features, gender_map)
+    elif variable_type == "race":
+        feature_labels = _format_feature_names(features, race_map)
+    elif variable_type == "created_utc_weekday":
+        feature_labels = _format_feature_names(features, weekday_map)
+    elif variable_type == "created_utc_month":
+        feature_labels = _format_feature_names(features, month_map)
+    elif variable_type == "topic" and TOPIC_REPRESENTATION == "max":
+        feature_labels = _format_feature_names(features, topic_map)
+    else:
+        feature_labels = features
+    return feature_labels
+
+def estimate_logit_influence(fit_model,
+                             x,
+                             vary_cols,
+                             vary_cols_labels=None,
+                             n_samples=1000,
+                             random_state=42):
+    """
+    Reference:
+        Making the Most of Statistical Analyses: Improving Interpretation and Presentation
+        Author(s): Gary King, Michael Tomz and Jason Wittenberg
+    """
+    ## Set Random State
+    if random_state:
+        np.random.seed(random_state)
+    ## Extract Model Parameters and Sample from Multivariate Normal
+    model_covariance = fit_model.cov_params()
+    model_means = fit_model.params
+    W = stats.multivariate_normal(model_means,
+                                  model_covariance).rvs(n_samples)
+    ## Format Labels
+    if vary_cols_labels is None:
+        vary_cols_labels = vary_cols
+    ## Isolate Means and Set Vary Columns to Reference Value
+    x = x.copy()
+    x_mean = x.mean(axis=0)
+    x_mean[vary_cols] = 0
+    ## Compute Baseline Probabilities
+    baseline_input_array = np.hstack([np.r_[1], x_mean.values]).reshape(1,-1)
+    baseline_yhat = 1 / (1 + np.exp(-np.matmul(W, baseline_input_array.T).T[0]))
+    baseline_q_hat = np.percentile(baseline_yhat, q=[2.5,50,97.5])
+    confidence_intervals = [baseline_q_hat]
+    ## Columpute Varied Probabilities
+    for col in vary_cols:
+        col_x_mean = x_mean.copy()
+        col_x_mean[col] = 1
+        input_array = np.hstack([np.r_[1], col_x_mean.values]).reshape(1,-1)
+        col_yhat = 1 / (1 + np.exp(-np.matmul(W, input_array.T).T[0]))
+        q_hat = np.percentile(col_yhat, q=[2.5,50,97.5])
+        confidence_intervals.append(q_hat)
+    ## Format Confidence Intervals
+    confidence_intervals = pd.DataFrame(confidence_intervals,
+                                        index=["baseline"] + vary_cols_labels,
+                                        columns=["lower","median","upper"])
+    return confidence_intervals
+
+
+def shaded_bar_plot(dataframe,
+                    median_col,
+                    lower_col="lower",
+                    upper_col="upper",
+                    xlabel=None,
+                    title=None):
+    """
+
+    """
+    fig, ax = plt.subplots(figsize=(10,5.8))
+    ax.hlines(list(range(dataframe.shape[0])),
+              xmin=dataframe[lower_col].min()-0.01,
+              xmax=dataframe[upper_col].max()+0.01,
+              linestyle=":",
+              alpha=0.4, 
+              zorder=-1,
+              linewidth=0.5)
+    ax.axvline(0, color="black", linestyle="-", alpha=0.5)
+    ax.barh(list(range(dataframe.shape[0])),
+            left=dataframe[lower_col],
+            width=dataframe[upper_col]-dataframe[lower_col],
+            color="C0",
+            alpha=0.2)
+    ax.scatter(dataframe[median_col],
+               list(range(dataframe.shape[0])), color="navy")
+    ax.set_yticks(list(range(dataframe.shape[0])))
+    kwargs = {"fontsize":5} if dataframe.shape[0] > 30 else {}
+    ax.set_yticklabels([i.replace("_"," ").title() for i in dataframe.index.tolist()], **kwargs)
+    ax.set_xlim(dataframe[lower_col].min()-0.01, dataframe[upper_col].max()+0.01)
+    ax.set_ylim(-.5, dataframe.shape[0]-.5)
+    ax.spines["right"].set_visible(False)
+    ax.spines["top"].set_visible(False)
+    if xlabel is not None:
+        ax.set_xlabel(xlabel, fontweight="bold")
+    if title is not None:
+        ax.set_title(title, loc="left", fontweight="bold", fontstyle="italic")
+    fig.tight_layout()
+    return fig, ax
 
 ###################
 ### Load Data
@@ -258,6 +380,7 @@ for col in list(data.columns):
     if col == DEPENDENT_VARIABLE:
         continue
     if IV_VARIABLE_TYPES[col] in ["categorical","binary"]:
+        data[col] = data[col].astype(int)
         data, _ = convert_to_one_hot(data, col)
 
 ## Data Scaling
@@ -285,6 +408,7 @@ feature_groups = {"age":[],
                   "race":[],
                   "created_utc_hour":[],
                   "created_utc_weekday":[],
+                  "created_utc_month":[],
                   "created_utc_year":[],
                   "activity":[],
                   "topic":[]}
@@ -300,33 +424,37 @@ for feature in features:
             feature_groups["activity"].append(feature)
             break
 
-
 ## Plot Coefficients
 for variable_type, variable_type_features in feature_groups.items():
-    plot_coefs = coefs.loc[variable_type_features]
-    fig, ax = plt.subplots(figsize=(10,5.8))
-    ax.hlines(list(range(plot_coefs.shape[0])),
-              xmin=plot_coefs["lower"].min()-0.01,
-              xmax=plot_coefs["upper"].max()+0.01,
-              linestyle=":", alpha=0.4, zorder=-1, linewidth=0.5)
-    ax.axvline(0, color="black", linestyle="-", alpha=0.5)
-    ax.barh(list(range(plot_coefs.shape[0])),
-            left=plot_coefs["lower"],
-            width=plot_coefs["upper"]-plot_coefs["lower"],
-            color="C0",
-            alpha=0.2)
-    ax.scatter(plot_coefs["coef"],
-            list(range(plot_coefs.shape[0])), color="navy")
-    ax.set_yticks(list(range(plot_coefs.shape[0])))
-    kwargs = {"fontsize":5} if variable_type=="topic" else {}
-    ax.set_yticklabels(plot_coefs.index.tolist(), **kwargs)
-    ax.set_xlim(plot_coefs["lower"].min()-0.01, plot_coefs["upper"].max()+0.01)
-    ax.set_ylim(-.5, plot_coefs.shape[0]-.5)
-    ax.spines["right"].set_visible(False)
-    ax.spines["top"].set_visible(False)
-    ax.set_title(variable_type.replace("_"," ").title(), loc="left", fontweight="bold", fontstyle="italic")
-    ax.set_xlabel("Coefficient", fontweight="bold")
-    fig.tight_layout()
+    feature_labels = format_feature_names(variable_type_features, variable_type)
+    plot_coefs = coefs.loc[variable_type_features].copy()
+    plot_coefs.index = feature_labels
+    fig, ax = shaded_bar_plot(plot_coefs,
+                              "coef",
+                              xlabel="Coefficient",
+                              title=variable_type.replace("_"," ").title())
     fig.savefig(f"{PLOT_DIR}logistic_coefficient_{variable_type}.png", dpi=200)
     plt.close(fig)
 
+## Estimate Race and Gender Influence
+race_ci = estimate_logit_influence(fit_model=fit,
+                                   x=data[features],
+                                   vary_cols=feature_groups["race"],
+                                   vary_cols_labels=format_feature_names(feature_groups["race"], "race"),
+                                   n_samples=1000,
+                                   random_state=42)
+gender_ci = estimate_logit_influence(fit_model=fit,
+                                     x=data[features],
+                                     vary_cols=feature_groups["gender"],
+                                     vary_cols_labels=format_feature_names(feature_groups["gender"], "gender"),
+                                     n_samples=1000,
+                                     random_state=42)
+
+## Plot Influence Effects
+for ci_df, ci_name in zip([race_ci,gender_ci],["race","gender"]):
+    fig, ax = shaded_bar_plot(ci_df,
+                              median_col="median",
+                              xlabel="Predicted Probability",
+                              title=f"Demographic Type: {ci_name.title()}")
+    fig.savefig(f"{PLOT_DIR}logistic_demographic_influence_{ci_name}.png", dpi=200)
+    plt.close(fig)
