@@ -8,6 +8,11 @@ PLOT_DIR = "./plots/model/dag/received_any_response/"
 
 ## Dependent Variable
 DEPENDENT_VARIABLE = "received_any_response"
+# DEPENDENT_VARIABLE = "received_physician_response"
+# DEPENDENT_VARIABLE = "time_to_first_response"
+
+## Dependent Variable Parameters
+LOGTRANSFORM = True
 
 ## Independent Variable Parameters
 DROP_NON_AUTOMOD = True
@@ -72,12 +77,12 @@ DV_VARIABLE_TYPES = {'n_response': "ordinal",
                      'received_non_physician_provider_in_training_response': "binary",
                      'received_any_provider_response': "binary",
                      'received_any_response': "binary",
-                     'time_to_first_response': "continous",
-                     'time_to_physician_first_response': "continous",
-                     'time_to_non_physician_provider_first_response': "continous",
-                     'time_to_physician_in_training_first_response': "continous",
-                     'time_to_non_physician_provider_in_training_first_response': "continous",
-                     'time_to_any_provider_response_first_response': "continous"}
+                     'time_to_first_response': "continuous",
+                     'time_to_physician_first_response': "continuous",
+                     'time_to_non_physician_provider_first_response': "continuous",
+                     'time_to_physician_in_training_first_response': "continuous",
+                     'time_to_non_physician_provider_in_training_first_response': "continuous",
+                     'time_to_any_provider_response_first_response': "continuous"}
 
 ## Codebook
 weekday_map = dict((i, w) for i, w in enumerate(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]))
@@ -204,12 +209,13 @@ def format_feature_names(features, variable_type):
         feature_labels = features
     return feature_labels
 
-def estimate_logit_influence(fit_model,
-                             x,
-                             vary_cols,
-                             vary_cols_labels=None,
-                             n_samples=1000,
-                             random_state=42):
+def estimate_glm_influence(fit_model,
+                           x,
+                           dv_type,
+                           vary_cols,
+                           vary_cols_labels=None,
+                           n_samples=1000,
+                           random_state=42):
     """
     Reference:
         Making the Most of Statistical Analyses: Improving Interpretation and Presentation
@@ -232,7 +238,9 @@ def estimate_logit_influence(fit_model,
     x_mean[vary_cols] = 0
     ## Compute Baseline Probabilities
     baseline_input_array = np.hstack([np.r_[1], x_mean.values]).reshape(1,-1)
-    baseline_yhat = 1 / (1 + np.exp(-np.matmul(W, baseline_input_array.T).T[0]))
+    baseline_yhat = np.matmul(W, baseline_input_array.T).T[0]
+    if dv_type == "binary":
+        baseline_yhat = 1 / (1 + np.exp(-baseline_yhat))
     baseline_q_hat = np.percentile(baseline_yhat, q=[2.5,50,97.5])
     confidence_intervals = [baseline_q_hat]
     ## Columpute Varied Probabilities
@@ -240,7 +248,9 @@ def estimate_logit_influence(fit_model,
         col_x_mean = x_mean.copy()
         col_x_mean[col] = 1
         input_array = np.hstack([np.r_[1], col_x_mean.values]).reshape(1,-1)
-        col_yhat = 1 / (1 + np.exp(-np.matmul(W, input_array.T).T[0]))
+        col_yhat = np.matmul(W, input_array.T).T[0]
+        if dv_type == "binary":
+            col_yhat = 1 / (1 + np.exp(-col_yhat))
         q_hat = np.percentile(col_yhat, q=[2.5,50,97.5])
         confidence_intervals.append(q_hat)
     ## Format Confidence Intervals
@@ -293,6 +303,8 @@ def shaded_bar_plot(dataframe,
 ### Load Data
 ###################
 
+print("Loading Data")
+
 ## Load Variables
 X = pd.read_csv(f"{DATA_DIR}/processed/independent.csv",index_col=0)
 Y = pd.read_csv(f"{DATA_DIR}/processed/dependent.csv",index_col=0)
@@ -318,6 +330,16 @@ if DROP_DEMO_LOC:
     X = X.drop(demo_loc_cols,axis=1)
     for dlc in demo_loc_cols:
         _ = IV_VARIABLE_TYPES.pop(dlc, None)
+
+## Drop Outliers / Anomalies (e.g. Negative Values)
+if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "continuous":
+    cont_mask = np.logical_and(~Y[DEPENDENT_VARIABLE].isnull(), Y[DEPENDENT_VARIABLE] > 0)
+    X = X[cont_mask]
+    Y = Y[cont_mask]
+
+## Log Transformation
+if LOGTRANSFORM and DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "continuous":
+    Y[DEPENDENT_VARIABLE] = np.log(Y[DEPENDENT_VARIABLE])
 
 ## Topic Columns
 topic_columns = X.columns[[i for i, c in enumerate(X.columns) if c == "max_topic"][0]+1:].tolist()
@@ -368,8 +390,10 @@ D = construct_directed_graph(covariates, set(topic_columns))
 D_edges = directed_to_edges(D, covariates+[DEPENDENT_VARIABLE])
 
 ########################
-### Non-graphical Model (Logistic Regression)
+### Non-graphical Model (Generalized Linear Model)
 ########################
+
+print("Modeling Data: Non-Graphical Approach")
 
 ## Data Formatting
 data = pd.DataFrame(np.hstack([X, Y.reshape(-1,1).astype(int)]),
@@ -396,8 +420,14 @@ x = sm.add_constant(x)
 features = data.drop(DEPENDENT_VARIABLE,axis=1).columns.tolist()
 
 ## Model Fitting
-model = sm.Logit(endog=y, exog=x)
-fit = model.fit(maxiter=1000, method="lbfgs",full_output=True)
+if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] in ["continuous","ordinal"]:
+    family = sm.families.Gaussian()
+elif DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "binary":
+    family = sm.families.Binomial()
+else:
+    raise ValueError("Variable type not recognized")
+model = sm.GLM(endog=y, exog=x, family=family)
+fit = model.fit(maxiter=1000, full_output=True)
 coefs = pd.DataFrame(np.hstack([fit.params.reshape(-1,1), fit.conf_int()]), 
                      index=["intercept"]+features,
                      columns=["coef","lower","upper"]).sort_values("coef").drop("intercept")
@@ -433,28 +463,30 @@ for variable_type, variable_type_features in feature_groups.items():
                               "coef",
                               xlabel="Coefficient",
                               title=variable_type.replace("_"," ").title())
-    fig.savefig(f"{PLOT_DIR}logistic_coefficient_{variable_type}.png", dpi=200)
+    fig.savefig(f"{PLOT_DIR}glm_coefficient_{variable_type}.png", dpi=200)
     plt.close(fig)
 
 ## Estimate Race and Gender Influence
-race_ci = estimate_logit_influence(fit_model=fit,
+race_ci = estimate_glm_influence(fit_model=fit,
+                                 x=data[features],
+                                 dv_type=DV_VARIABLE_TYPES[DEPENDENT_VARIABLE],
+                                 vary_cols=feature_groups["race"],
+                                 vary_cols_labels=format_feature_names(feature_groups["race"], "race"),
+                                 n_samples=1000,
+                                 random_state=42)
+gender_ci = estimate_glm_influence(fit_model=fit,
                                    x=data[features],
-                                   vary_cols=feature_groups["race"],
-                                   vary_cols_labels=format_feature_names(feature_groups["race"], "race"),
+                                   dv_type=DV_VARIABLE_TYPES[DEPENDENT_VARIABLE],
+                                   vary_cols=feature_groups["gender"],
+                                   vary_cols_labels=format_feature_names(feature_groups["gender"], "gender"),
                                    n_samples=1000,
                                    random_state=42)
-gender_ci = estimate_logit_influence(fit_model=fit,
-                                     x=data[features],
-                                     vary_cols=feature_groups["gender"],
-                                     vary_cols_labels=format_feature_names(feature_groups["gender"], "gender"),
-                                     n_samples=1000,
-                                     random_state=42)
 
 ## Plot Influence Effects
 for ci_df, ci_name in zip([race_ci,gender_ci],["race","gender"]):
     fig, ax = shaded_bar_plot(ci_df,
                               median_col="median",
-                              xlabel="Predicted Probability",
+                              xlabel="Predicted Probability" if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "binary" else "Predicted {}".format(DEPENDENT_VARIABLE.replace("_"," ").title()),
                               title=f"Demographic Type: {ci_name.title()}")
-    fig.savefig(f"{PLOT_DIR}logistic_demographic_influence_{ci_name}.png", dpi=200)
+    fig.savefig(f"{PLOT_DIR}glm_demographic_influence_{ci_name}.png", dpi=200)
     plt.close(fig)
