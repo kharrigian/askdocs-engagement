@@ -10,3 +10,5 @@ nltk
 python-Levenshtein
 scikit-learn
 tomotopy
+ananke-causal
+statsmodels

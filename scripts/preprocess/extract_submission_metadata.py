@@ -353,7 +353,8 @@ def _get_metadata(post):
         "created_utc_month":datetime.strftime(post_created_dt, "%B"),
         "created_utc_year":post_created_dt.year,
         "title_length":len_title,
-        "selftext_length":len_selftext
+        "selftext_length":len_selftext,
+        "post_deleted":post.get("selftext","") == "[removed]" or post.get("selftext","") == "\[removed\]" 
     }
     return post.get("id"), meta
 
