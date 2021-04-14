@@ -61,9 +61,9 @@ IV_VARIABLE_TYPES = {'created_utc_hour': "categorical",
                      'gender_title': "categorical",
                      'gender_selftext': "categorical",
                      'gender_all': "categorical",
-                     'age_title': "ordinal",
-                     'age_selftext': "ordinal",
-                     'age_all': "ordinal",
+                     'age_title': "categorical",
+                     'age_selftext': "categorical",
+                     'age_all': "categorical",
                      'race_title': "categorical",
                      'race_selftext': "categorical",
                      'race_all': "categorical",
@@ -84,10 +84,14 @@ DV_VARIABLE_TYPES = {'n_response': "ordinal",
                      'time_to_non_physician_provider_in_training_first_response': "continuous",
                      'time_to_any_provider_response_first_response': "continuous"}
 
+## Age Bins
+age_bins = [0, 13, 20, 35, 50, 100]
+
 ## Codebook
 weekday_map = dict((i, w) for i, w in enumerate(["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]))
 month_map = dict((i,m) for i, m in enumerate(["January","February","March","April","May","June","July","August","September","October","November","December"]))
 race_map = dict((i,r) for i, r in enumerate(["white","black","hispanic","asian","indian","mixed","middle_eastern","pacific_islander"]))
+age_map = dict((i, f"{l}_{u}") for i, (l,u) in enumerate(zip(age_bins[:-1],age_bins[1:])))
 gender_map = {0:"male",1:"female"}
 topic_map = dict()
 
@@ -103,14 +107,20 @@ def classify_covariate(covariate, topic_variables):
     """
 
     """
-    if any(covariate.startswith(char) for char in ["race","age","gender"]):
-        c_type = "demo"
+    if covariate.startswith("race"):
+        c_type = "demo_race"
+    elif covariate.startswith("gender"):
+        c_type = "demo_gender"
+    elif covariate.startswith("age"):
+        c_type = "demo_age"
     elif covariate in topic_variables:
         c_type = "topic"
-    elif covariate.endswith("_length") or covariate == "is_automod_format":
+    elif covariate.endswith("_length") or covariate.startswith("is_automod_format"):
         c_type = "description"
-    elif covariate.startswith("created_utc"):
-        c_type = "temporal"
+    elif any(covariate.startswith(char) for char in ["created_utc_hour","created_utc_weekday"]):
+        c_type = "temporal_alpha"
+    elif covariate.startswith("created_utc_year") or covariate.startswith("created_utc_month"):
+        c_type = "temporal_beta"
     elif covariate == "n_prior_submissions":
         c_type = "participation"
     elif covariate == "response":
@@ -118,6 +128,17 @@ def classify_covariate(covariate, topic_variables):
     else:
         raise ValueError("Covariate type not recognized")
     return c_type
+
+def bin_data(value, bins):
+    """
+
+    """
+    if value == -1:
+        return -1
+    for i, (lower, upper) in enumerate(zip(bins[:-1],bins[1:])):
+        if value >= lower and value < upper:
+            return i
+    return None
 
 def construct_directed_graph(covariates,
                              topic_variables):
@@ -138,11 +159,14 @@ def construct_directed_graph(covariates,
         label_types_map[unique_label_type] = set([label for label, label_type in zip(labels, label_types) if label_type == unique_label_type])
     ## Mappings
     DAG_map = {
-        "demo":["topic","temporal","description","response"],
+        "demo_age":["topic","temporal_alpha","description","response"],
+        "demo_gender":["topic","temporal_alpha","description","response"],
+        "demo_race":["topic","temporal_alpha","description","response"],
         "participation":["description","response"],
         "topic":["description","response"],
         "description":["response"],
-        "temporal":["response"],
+        "temporal_alpha":["response"],
+        "temporal_beta":["response"],
         "response":[]
     }
     ## Generate the DAG
@@ -168,11 +192,14 @@ def directed_to_edges(D, vertices):
     return edges
 
 def convert_to_one_hot(X,
-                       covariate):
+                       covariate,
+                       keep_all=False):
     """
 
     """
-    targets = sorted(X[covariate].unique())[1:]
+    targets = sorted(X[covariate].unique())
+    if not keep_all:
+        targets = targets[1:]
     X_one_hot = [(X[covariate]==target).astype(int).to_frame(f"{covariate}_{target}") for target in targets]
     X_one_hot = pd.concat(X_one_hot, axis=1)
     one_hot_columns = X_one_hot.columns.tolist()
@@ -187,9 +214,8 @@ def _format_feature_names(feature_names, mapping):
     feature_names_formatted = []
     for f in feature_names:
         find = int(f.split("_")[-1])
-        feature_names_formatted.append(mapping[find])
+        feature_names_formatted.append(mapping.get(find,"unknown"))
     return feature_names_formatted
-
 
 def format_feature_names(features, variable_type):
     """
@@ -199,6 +225,8 @@ def format_feature_names(features, variable_type):
         feature_labels = _format_feature_names(features, gender_map)
     elif variable_type == "race":
         feature_labels = _format_feature_names(features, race_map)
+    elif variable_type == "age":
+        feature_labels = _format_feature_names(features, age_map)
     elif variable_type == "created_utc_weekday":
         feature_labels = _format_feature_names(features, weekday_map)
     elif variable_type == "created_utc_month":
@@ -259,7 +287,6 @@ def estimate_glm_influence(fit_model,
                                         columns=["lower","median","upper"])
     return confidence_intervals
 
-
 def shaded_bar_plot(dataframe,
                     median_col,
                     lower_col="lower",
@@ -299,6 +326,25 @@ def shaded_bar_plot(dataframe,
     fig.tight_layout()
     return fig, ax
 
+def estimate_causal_effects(dag_model,
+                            variable,
+                            categories,
+                            est_method="aipw",
+                            n_bootstrap=10,
+                            alpha=0.05):
+    ce_estimates = []
+    for c, category in enumerate(categories):
+        if f"{variable}_{category}" not in dag_model.vertices:
+            continue
+        print(f"Computing Effect for Group {c+1}/{len(categories)}: {category}")
+        dag_ce = estimation.CausalEffect(dag_model, f"{variable}_{category}", DEPENDENT_VARIABLE)
+        dag_ce_est = dag_ce.compute_effect(data, est_method, n_bootstraps=n_bootstrap, alpha=alpha)
+        dag_ce_or = np.exp(np.array(dag_ce_est))
+        ce_estimates.append([category] + list(dag_ce_or))
+    ce_estimates = pd.DataFrame(ce_estimates,
+                                columns=["category","median","lower","upper"]).set_index("category")
+    return ce_estimates
+
 ###################
 ### Load Data
 ###################
@@ -330,6 +376,12 @@ if DROP_DEMO_LOC:
     X = X.drop(demo_loc_cols,axis=1)
     for dlc in demo_loc_cols:
         _ = IV_VARIABLE_TYPES.pop(dlc, None)
+
+## Age Bins
+for field in ["selftext","title","all"]:
+    if f"age_{field}" not in X.columns:
+        continue
+    X[f"age_{field}"] = X[f"age_{field}"].map(lambda a: bin_data(a, age_bins))
 
 ## Drop Outliers / Anomalies (e.g. Negative Values)
 if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "continuous":
@@ -385,10 +437,6 @@ covariates = X.columns.tolist()
 X = X[covariates].values
 Y = Y[DEPENDENT_VARIABLE].values
 
-## Create Directed Graph
-D = construct_directed_graph(covariates, set(topic_columns))
-D_edges = directed_to_edges(D, covariates+[DEPENDENT_VARIABLE])
-
 ########################
 ### Non-graphical Model (Generalized Linear Model)
 ########################
@@ -396,8 +444,10 @@ D_edges = directed_to_edges(D, covariates+[DEPENDENT_VARIABLE])
 print("Modeling Data: Non-Graphical Approach")
 
 ## Data Formatting
-data = pd.DataFrame(np.hstack([X, Y.reshape(-1,1).astype(int)]),
+data = pd.DataFrame(np.hstack([X, Y.reshape(-1,1)]),
                     columns=covariates+[DEPENDENT_VARIABLE])
+if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "binary":
+    data[DEPENDENT_VARIABLE] = data[DEPENDENT_VARIABLE].astype(int)
 
 ## One Hot Encoding
 for col in list(data.columns):
@@ -482,6 +532,10 @@ gender_ci = estimate_glm_influence(fit_model=fit,
                                    n_samples=1000,
                                    random_state=42)
 
+## Cache Causal Effects
+gender_ci.to_csv(f"{PLOT_DIR}glm_demographic_influence_gender.csv")
+race_ci.to_csv(f"{PLOT_DIR}glm_demographic_influence_race.csv")
+
 ## Plot Influence Effects
 for ci_df, ci_name in zip([race_ci,gender_ci],["race","gender"]):
     fig, ax = shaded_bar_plot(ci_df,
@@ -489,4 +543,93 @@ for ci_df, ci_name in zip([race_ci,gender_ci],["race","gender"]):
                               xlabel="Predicted Probability" if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "binary" else "Predicted {}".format(DEPENDENT_VARIABLE.replace("_"," ").title()),
                               title=f"Demographic Type: {ci_name.title()}")
     fig.savefig(f"{PLOT_DIR}glm_demographic_influence_{ci_name}.png", dpi=200)
+    plt.close(fig)
+
+########################
+### Graphical Model (Visualization)
+########################
+
+## Create Directed Graph (Visualization - Collapse Encodings)
+covariates_vis = sorted(set(list(map(lambda c: c if c not in topic_columns else "topic", covariates))))
+D_vis = construct_directed_graph(covariates_vis, ["topic"])
+D_edges_vis = directed_to_edges(D_vis, covariates_vis+[DEPENDENT_VARIABLE])
+
+## Create Graph
+dag_vis = graphs.DAG(vertices=covariates_vis+[DEPENDENT_VARIABLE], di_edges=D_edges_vis)
+dag_vis.draw().render(f"{PLOT_DIR}/dag_simple.gv", view=False)
+
+########################
+### Graphical Model
+########################
+
+print("Modeling Data: Graphical Approach")
+
+## Data Formatting
+data = pd.DataFrame(np.hstack([X, Y.reshape(-1,1)]),
+                    columns=covariates+[DEPENDENT_VARIABLE])
+if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "binary":
+    data[DEPENDENT_VARIABLE] = data[DEPENDENT_VARIABLE].astype(int)
+
+## One Hot Encoding
+for col in list(data.columns):
+    if col == DEPENDENT_VARIABLE:
+        continue
+    if IV_VARIABLE_TYPES[col] in ["categorical","binary"]:
+        data[col] = data[col].astype(int)
+        data, _ = convert_to_one_hot(data, col, keep_all=data[col].min()==-1)
+
+## Data Scaling
+for covariate in data.columns.tolist():
+    if covariate == DEPENDENT_VARIABLE or covariate[-1].isdigit():
+        continue
+    data[covariate] = (data[covariate] - data[covariate].mean()) / data[covariate].std()
+
+## Clean Topics for Patsy Support
+clean_str = lambda t: t.replace("(","").replace(")","").replace(" ","_").lower().replace("-","_").replace(",","")
+topic_cols_clean = [clean_str(t) for t in topic_columns]
+data = data.rename(columns=dict(zip(topic_columns, topic_cols_clean)))
+
+## Clean One-hots for Patsy Support
+for field in ["selftext","title","all"]:
+    for demo in ["gender","race","age"]:
+        demo_field_cols = [c for c in data.columns if c.startswith(f"{demo}_{field}")]
+        demo_labels = [f"{demo}_{field}_{name}" for name in format_feature_names(demo_field_cols, demo)]
+        if len(demo_labels) != 0:
+            data = data.rename(columns=dict(zip(demo_field_cols, demo_labels)))
+
+## Create Directed Graph
+features = data.drop(DEPENDENT_VARIABLE,axis=1).columns.tolist()
+D = construct_directed_graph(features, set(topic_cols_clean))
+D_edges = directed_to_edges(D, features+[DEPENDENT_VARIABLE])
+
+## Initial Graphical Model
+dag_model = graphs.DAG(features+[DEPENDENT_VARIABLE], D_edges)
+
+## Causal Effect Estimation
+gender_ce = estimate_causal_effects(dag_model,
+                                    "gender_all",
+                                    ["unknown","male","female"],
+                                    est_method="aipw",
+                                    n_bootstrap=10,
+                                    alpha=0.05)
+race_ce = estimate_causal_effects(dag_model,
+                                  "race_all",
+                                  ["unknown","white","black","hispanic","asian","indian","mixed","middle_eastern","pacific_islander"],
+                                  est_method="aipw",
+                                  n_bootstrap=10,
+                                  alpha=0.05)
+
+## Cache Causal Effects
+gender_ce.to_csv(f"{PLOT_DIR}dag_demographic_causal_effect_gender.csv")
+race_ce.to_csv(f"{PLOT_DIR}dag_demographic_causal_effect_race.csv")
+
+## Plot Causal Effects
+for ci_df, ci_name in zip([race_ce,gender_ce],["race","gender"]):
+    fig, ax = shaded_bar_plot(ci_df,
+                              median_col="median",
+                              xlabel="Odds Ratio" if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "binary" else "Average Causal Effect (ACE)",
+                              title=f"Demographic Type: {ci_name.title()}")
+    if DV_VARIABLE_TYPES[DEPENDENT_VARIABLE] == "binary":
+        ax.axvline(1, alpha=0.2, color="black", zorder=-1)
+    fig.savefig(f"{PLOT_DIR}dag_demographic_causal_effect_{ci_name}.png", dpi=200)
     plt.close(fig)
