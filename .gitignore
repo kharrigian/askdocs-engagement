@@ -6,11 +6,7 @@ data/processed/models
 ## Documentation
 documentation/*.pdf
 documentation/template
-
-## Plots
-plots/summary_statistics/
-plots/metadata_distributions/
-plots/model/
+documentation/peer_review/
 
 ## Code
 scripts/utilities/legacy
